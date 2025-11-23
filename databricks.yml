@@ -1,0 +1,29 @@
+# This is a Databricks asset bundle definition for synapse migration.
+# The Databricks extension requires databricks.yml configuration file.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+
+bundle:
+  name: synapse_migration
+
+include:
+  - resources/*
+  - bundle.variables.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-7551573531433095.15.azuredatabricks.net/
+
+  qa:
+    mode: development
+    default: true
+    workspace:
+      host: https://adb-7551573531433095.15.azuredatabricks.net/ # your QA workspace host
+
+  ## Optionally, there could be 'prod' targets here.
+  #
+  # prod:
+  #   workspace:
+  #     host: 

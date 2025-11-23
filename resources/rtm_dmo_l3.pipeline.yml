@@ -1,0 +1,17 @@
+resources:
+  pipelines:
+    rtm_dmo_l3:
+      name: RTM_DMO_L3
+      clusters:
+        - label: default
+          node_type_id: Standard_D4ds_v5
+          autoscale:
+            min_workers: 1
+            max_workers: 5
+            mode: ENHANCED
+      libraries:
+        - notebook:
+            path: ../transformations/RTM_DMO_L3.py
+      target: ${var.silver_schema}
+      development: true
+      catalog: ${var.silver_catalog}

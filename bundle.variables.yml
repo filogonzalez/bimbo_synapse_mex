@@ -1,0 +1,11 @@
+variables:
+  bronze_catalog: 
+    default: cat_rtmgb_dv
+  bronze_schema: 
+    default: groglortmbm_cz
+  silver_catalog: 
+    default: cat_dnamxgro_dv
+  silver_schema: 
+    default: gromexdmo_cz
+  bundle_target:
+    default: "${bundle.target}"

@@ -1,0 +1,17 @@
+resources:
+  jobs:
+    WF_RTMFACTS_ORQUESTATOR_DY_L1:
+      name: WF_RTMFACTS_ORQUESTATOR_DY_L1
+      tasks:
+        - task_key: RTM_Facts_L1
+          notebook_task:
+            notebook_path: ../RTM_Facts_L1.py
+            source: WORKSPACE
+          environment_key: Default
+      queue:
+        enabled: true
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "4"
+      performance_target: PERFORMANCE_OPTIMIZED
