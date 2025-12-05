@@ -1,7 +1,7 @@
 resources:
   jobs:
-    WF_RTMFACTS_ORQUESTATOR_DY_L1:
-      name: WF_RTMFACTS_ORQUESTATOR_DY_L1
+    wf_rtmfacts_orquestador_dy_l1:
+      name: wf_rtmfacts_orquestador_dy_l1
       tasks:
         - task_key: RTM_Facts_L1
           notebook_task:

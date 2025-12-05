@@ -1,7 +1,7 @@
 resources:
   jobs:
-    WF_DMO_ORCHESTADOR_DY_L1:
-      name: WF_DMO_ORCHESTADOR_DY_L1
+    wf_dmo_orchestador_dy_l1:
+      name: wf_dmo_orchestador_dy_l1
       schedule:
         quartz_cron_expression: 32 0 7 * * ?
         timezone_id: America/Mexico_City

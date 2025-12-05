@@ -256,7 +256,7 @@ SELECT
     uv.User_Code AS Route,
     ret.Retailer_Code,
     ret.Retailer_Name,
-    to_date(srh.Date) AS `Survey Date`,
+    to_date(srh.Date) AS `Survey_Date`,
     qv.Description AS Question,
     srd.Answer,
     cast('{date_begin}' AS DATE) AS storeday
@@ -874,7 +874,7 @@ SELECT DISTINCT
     lvv.Lov_Name AS Forma_De_Pago,
     rcsdv.amount AS Cantidad_Esperada,
     rcsdv.acutal_amount AS Cantidad_Recibida,
-    rcsdv.variance_amount AS Variación
+    rcsdv.variance_amount AS `Variación`
 FROM
     {bronze_catalog}.{bronze_schema}.Trip_V AS tv
 LEFT JOIN {bronze_catalog}.{bronze_schema}.Route_Stock_Settlement_Header_V AS rsshv ON
@@ -1734,5 +1734,102 @@ perform_overwrite_partition(
     target_table_name="Z12_FaltantesAS",
     partition_filter=f"Date = '{date_begin}'"
 )
+# COMMAND ----------
+# Activity: C07_StockAllocation_estatus
+# Logic: Delete where Date = begin_date -> Insert
+
+print("Processing C07_StockAllocation_estatus...")
+
+c07_stock_allocation_estatus_query = f"""
+SELECT
+    sc.Sales_Center_Code AS sc_code,
+    rv.Route_Code,
+    vlh.Reference_No,
+    to_date(vlh.Submitted_Date) AS Date,
+    CASE
+        vlh.Status WHEN 'A' THEN 'Cargo Aceptado'
+        WHEN 'I' THEN 'Cargo pendiente'
+        ELSE vlh.Status
+    END AS Status,
+    vlh.Allocated_Status,
+    em.Employee_Code AS Seller_Code,
+    CONCAT(em.First_Name, ' ', em.Last_Name) AS Seller,
+    uvs.User_Code AS Supervisor_Code,
+    CONCAT(uvs.First_Name, ' ', uvs.Last_Name) AS Supervisor,
+    pmv.Product_Code,
+    pmv.Short_Description,
+    pu.Lov_Name AS Presentacion,
+    vld.Load_Qty,
+    vld.Unit_Price,
+    vld.Load_Value
+FROM
+    {bronze_catalog}.{bronze_schema}.Van_Load_Header_V as vlh
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Sales_Center_V AS sc ON
+    (vlh.Sales_Center_Id = sc.Sales_Center_Id
+        AND vlh.Instance = sc.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Route_V AS rv ON
+    (vlh.Route_Id = rv.Route_Id
+        AND vlh.Sales_Center_Id = rv.Sales_Center_Id
+        AND vlh.Instance = rv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.User_V AS uv ON
+    (vlh.User_Id = uv.User_Id
+        AND vlh.Sales_Center_Id = uv.Sales_Center_Id
+        AND vlh.Instance = uv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_User_Mapping_V AS pum ON
+    (vlh.User_Id = pum.User_Id
+        AND vlh.Instance = pum.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_V AS pv ON
+    (pum.Position_Id = pv.Position_Id
+        AND pum.Instance = pv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_V AS pvs ON
+    (pv.Parent_Id = pvs.Position_Id
+        AND pv.Instance = pvs.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_User_Mapping_V AS pums ON
+    (pvs.Position_Id = pums.Position_Id
+        AND pvs.Instance = pums.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.User_V AS uvs ON
+    (pums.User_Id = uvs.User_Id
+        AND vlh.Sales_Center_Id = uvs.Sales_Center_Id
+        AND pums.Instance = uvs.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Employee_Master_V AS em ON
+    vlh.User_Id = em.Own_Route_Id
+    AND vlh.Instance = em.Instance
+    AND em.Active = true
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Van_Load_Detail_V AS vld ON
+    vlh.Van_Load_Header_Id = vld.Van_Load_Header_Id 
+    AND vlh.Instance = vld.Instance
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Product_Master_V AS pmv ON
+    vld.Product_Id = pmv.Product_Id  
+    AND vld.Instance = pmv.Instance
+    AND pmv.Product_Level_Id = 5
+    AND pmv.Active = true
+LEFT JOIN
+    (
+    SELECT
+        DISTINCT Lov_Id,
+        Lov_Code,
+        Lov_Name,
+        Instance,
+        Lov_Type
+    FROM
+        {bronze_catalog}.{bronze_schema}.List_Value_V
+    WHERE
+        Lov_Type = 'PRODUCT_UOM') AS pu ON
+    (vld.Load_Uom_Id = pu.Lov_Id
+        AND vld.Instance = pu.Instance)
+WHERE
+    1 = 1
+    AND sc.Sales_Center_Code LIKE '02%'
+    AND to_date(vlh.Submitted_Date) = '{date_begin}'
+"""
+
+df_c07_estatus = spark.sql(c07_stock_allocation_estatus_query)
+
+perform_overwrite_partition(
+    source_df=df_c07_estatus,
+    target_table_name="C07_StockAllocation_estatus",
+    partition_filter=f"Date = '{date_begin}'"
+)
 
 print("Pipeline completed successfully.")
+
