@@ -96,12 +96,8 @@ def perform_overwrite_partition(source_df, target_table_name, partition_filter):
         print(f"Overwrite completed.")
 
 # COMMAND ----------
-# ---------------------------------------------------------
-# CHAIN 1: V12 -> V07 -> V08 -> V19 -> V04 -> A09 -> L01 -> A05
-# ---------------------------------------------------------
 
 # Activity: V12_VisitDetails
-# DependsOn: FECHA_hoy
 # Logic: Delete where VisitDate = FECHA -> Insert
 
 print("Processing V12_VisitDetails...")
@@ -151,7 +147,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V07_GRN
-# DependsOn: V12_VisitDetails
 # Logic: Delete where GRN_Date = FECHA -> Insert
 
 print("Processing V07_GRN...")
@@ -200,7 +195,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V08_BlueLabel
-# DependsOn: V07_GRN
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing V08_BlueLabel...")
@@ -244,7 +238,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V19_Surveys
-# DependsOn: V08_BlueLabel
 # Logic: Delete where storeday = FECHA -> Insert
 
 print("Processing V19_Surveys...")
@@ -294,7 +287,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V04_OrderDump
-# DependsOn: V19_Surveys
 # Logic: UPSERT Keys: Order_Number, Product_Code, Date
 # Filter: (Date >= FECHA OR Delivery_Date >= FECHA_HOY) AND Delivery_Date IS NOT NULL
 
@@ -381,7 +373,6 @@ perform_merge(
 
 # COMMAND ----------
 # Activity: A09_StockAjustment
-# DependsOn: V04_OrderDump (Skipping inactive V10)
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing A09_StockAjustment...")
@@ -465,7 +456,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: L01_Remisiones
-# DependsOn: A09_StockAjustment
 # Logic: Delete where GH_Acceptance_Date = FECHA -> Insert
 
 print("Processing L01_Remisiones...")
@@ -536,7 +526,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: A05_PesitoCredit
-# DependsOn: L01_Remisiones
 # Logic: Delete where storeday = FECHA -> Insert
 
 print("Processing A05_PesitoCredit...")
@@ -616,7 +605,6 @@ perform_overwrite_partition(
 # ---------------------------------------------------------
 
 # Activity: V03_POMS_Tmp
-# DependsOn: FECHA_hoy
 # Logic: Delete where delivery_date = FECHA -> Insert
 
 print("Processing V03_POMS_Tmp...")
@@ -694,7 +682,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V11_Dailykpi
-# DependsOn: V03_POMS_Tmp
 # Logic: Delete where TargetDate = FECHA -> Insert
 
 print("Processing V11_Dailykpi...")
@@ -754,7 +741,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V03_POMS
-# DependsOn: V11_Dailykpi
 # Logic: Delete where delivery_date = FECHA -> Insert
 # Same structure as V03_POMS_Tmp but Status = 'A'
 
@@ -772,7 +758,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: SemaforizacionRutas
-# DependsOn: V03_POMS
 # Logic: Source >= 1 month ago. Sink: Delete >= 2 months ago -> Insert.
 # OPTIMIZATION: Merge last 1 month.
 
@@ -825,7 +810,6 @@ perform_merge(
 
 # COMMAND ----------
 # Activity: SemaforizacionMes
-# DependsOn: SemaforizacionRutas
 # Logic: Truncate -> Insert
 
 print("Processing SemaforizacionMes...")
@@ -854,7 +838,6 @@ df_semaforo_mes.write.format("delta").mode("overwrite").saveAsTable(f"{silver_ca
 
 # COMMAND ----------
 # Activity: SemaforizacionRutas_Pagos
-# DependsOn: SemaforizacionMes
 # Logic: Merge last 1 month.
 
 print("Processing SemaforizacionRutas_Pagos...")
@@ -921,7 +904,6 @@ perform_merge(
 
 # COMMAND ----------
 # Activity: Semaforizacion_SSCDD
-# DependsOn: SemaforizacionRutas_Pagos
 # Logic: Truncate -> Insert
 
 print("Processing Semaforizacion_SSCDD...")
@@ -961,7 +943,6 @@ df_sscd.write.format("delta").mode("overwrite").saveAsTable(f"{silver_catalog}.{
 
 # COMMAND ----------
 # Activity: C07_StockAllocation
-# DependsOn: Semaforizacion_SSCDD
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing C07_StockAllocation...")
@@ -1038,7 +1019,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V02_VanRejection
-# DependsOn: C07_StockAllocation
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing V02_VanRejection...")
@@ -1086,13 +1066,12 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: Z01_Payroll
-# DependsOn: V02_VanRejection
 # Logic: Delete Date BETWEEN fecha_ini AND FECHA -> Insert
 
-# We need a date_begin_minus_1 variable
-date_begin_minus_1 = spark.sql(f"SELECT date_sub('{date_begin}', 1) as d").first().d
+# We need a two_days_ago variable
+two_days_ago = spark.sql(f"SELECT date_sub('{date_begin}', 1) as d").first().d
 
-print(f"Processing Z01_Payroll for range {date_begin_minus_1} to {date_begin}...")
+print(f"Processing Z01_Payroll for range {two_days_ago} to {date_begin}...")
 
 z01_payroll_query = f"""
 SELECT
@@ -1132,7 +1111,7 @@ LEFT JOIN (
         AND epv.Instance = lvp.Instance)
 WHERE
     1 = 1
-    AND to_date(SalesDate) BETWEEN '{date_begin_minus_1}' AND '{date_begin}'
+    AND to_date(SalesDate) BETWEEN '{two_days_ago}' AND '{date_begin}'
 """
 
 df_z01 = spark.sql(z01_payroll_query)
@@ -1140,12 +1119,11 @@ df_z01 = spark.sql(z01_payroll_query)
 perform_overwrite_partition(
     source_df=df_z01,
     target_table_name="Z01_Payroll",
-    partition_filter=f"Date BETWEEN '{date_begin_minus_1}' AND '{date_begin}'"
+    partition_filter=f"Date BETWEEN '{two_days_ago}' AND '{date_begin}'"
 )
 
 # COMMAND ----------
 # Activity: Z07_Dev_SalesCenter
-# DependsOn: Z01_Payroll
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing Z07_Dev_SalesCenter...")
@@ -1191,7 +1169,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: Z09_Inventory
-# DependsOn: Z07_Dev_SalesCenter
 # Logic: Delete where StockFreezeDate = FECHA -> Insert
 
 print("Processing Z09_Inventory...")
@@ -1222,7 +1199,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V15_ProductBuying
-# DependsOn: Z09_Inventory
 # Logic: Insert where Created_Date = GETDATE() - 1 (Yesterday)
 
 print("Processing V15_ProductBuying...")
@@ -1270,7 +1246,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V16_PurchaseReturn
-# DependsOn: V15_ProductBuying
 # Logic: Insert where Created_Date = GETDATE() - 1
 
 print("Processing V16_PurchaseReturn...")
@@ -1344,7 +1319,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V01_VanUnload
-# DependsOn: V16_PurchaseReturn
 # Logic: Insert where Mobile_Date = GETDATE() - 1
 
 print("Processing V01_VanUnload...")
@@ -1407,7 +1381,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: Usuarios_Loggeados
-# DependsOn: V01_VanUnload
 # Logic: Truncate -> Insert
 # Query: DATE >= DATEADD(DAY ,-7, GETDATE())
 
@@ -1450,7 +1423,6 @@ df_usuarios.write.format("delta").mode("overwrite").saveAsTable(f"{silver_catalo
 
 # COMMAND ----------
 # Activity: V06_VanStockInHand
-# DependsOn: Usuarios_Loggeados
 # Logic: Delete where StockFreezeDate = FECHA -> Insert
 
 print("Processing V06_VanStockInHand...")
@@ -1489,7 +1461,6 @@ perform_overwrite_partition(
 # ---------------------------------------------------------
 
 # Activity: A08_StockTransferWithinWarehouse
-# DependsOn: FECHA_hoy (Implicitly depends on earlier tasks due to linear flow)
 # Logic: Delete where CreatedDate = FECHA -> Insert
 
 print("Processing A08_StockTransferWithinWarehouse...")
@@ -1580,7 +1551,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: Z13_MobileVersionCode
-# DependsOn: A08_StockTransferWithinWarehouse
 # Logic: Delete where [Request Date] = FECHA -> Insert
 
 print("Processing Z13_MobileVersionCode...")
@@ -1592,8 +1562,8 @@ SELECT
     Su.First_Name,
     lms.user_id,
     lms.Version_Code as VersionCode,
-    # get_json_object(lms.Request_Header, '$.VersionCode') as VersionCode,
-    to_date(lms.Request_Date) as `Request Date`,
+    -- get_json_object(lms.Request_Header, '$.VersionCode') as VersionCode,
+    to_date(lms.Request_Date) as `Request_Date`,
     Su.Active,
     lms.Instance
 FROM
@@ -1616,7 +1586,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: V22_POMS_AS
-# DependsOn: Z13_MobileVersionCode
 # Logic: Delete where order_date = FECHA -> Insert
 
 print("Processing V22_POMS_AS...")
@@ -1699,7 +1668,6 @@ perform_overwrite_partition(
 
 # COMMAND ----------
 # Activity: Z12_FaltantesAS
-# DependsOn: V22_POMS_AS
 # Logic: Delete where Date = FECHA -> Insert
 
 print("Processing Z12_FaltantesAS...")
@@ -1830,6 +1798,101 @@ perform_overwrite_partition(
     target_table_name="C07_StockAllocation_estatus",
     partition_filter=f"Date = '{date_begin}'"
 )
+
+# COMMAND ----------
+# Activity: C07_StockAllocation_pendientes
+# Logic: Truncate -> Insert
+
+print("Processing C07_StockAllocation_pendientes...")
+
+c07_stock_allocation_pendientes_query = f"""
+SELECT
+    sc.Sales_Center_Code AS sc_code,
+    rv.Route_Code,
+    vlh.Reference_No,
+    to_date(vlh.Submitted_Date) AS Date,
+    CASE
+        vlh.Status WHEN 'A' THEN 'Cargo Aceptado'
+        WHEN 'I' THEN 'Cargo pendiente'
+        ELSE vlh.Status
+    END AS Status,
+    vlh.Allocated_Status,
+    em.Employee_Code AS Seller_Code,
+    CONCAT(em.First_Name, ' ', em.Last_Name) AS Seller,
+    uvs.User_Code AS Supervisor_Code,
+    CONCAT(uvs.First_Name, ' ', uvs.Last_Name) AS Supervisor,
+    pmv.Product_Code,
+    pmv.Short_Description,
+    pu.Lov_Name AS Presentacion,
+    vld.Load_Qty,
+    vld.Unit_Price,
+    vld.Load_Value
+FROM
+    {bronze_catalog}.{bronze_schema}.Van_Load_Header_V as vlh
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Sales_Center_V AS sc ON
+    (vlh.Sales_Center_Id = sc.Sales_Center_Id
+        AND vlh.Instance = sc.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Route_V AS rv ON
+    (vlh.Route_Id = rv.Route_Id
+        AND vlh.Sales_Center_Id = rv.Sales_Center_Id
+        AND vlh.Instance = rv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.User_V AS uv ON
+    (vlh.User_Id = uv.User_Id
+        AND vlh.Sales_Center_Id = uv.Sales_Center_Id
+        AND vlh.Instance = uv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_User_Mapping_V AS pum ON
+    (vlh.User_Id = pum.User_Id
+        AND vlh.Instance = pum.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_V AS pv ON
+    (pum.Position_Id = pv.Position_Id
+        AND pum.Instance = pv.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_V AS pvs ON
+    (pv.Parent_Id = pvs.Position_Id
+        AND pv.Instance = pvs.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Position_User_Mapping_V AS pums ON
+    (pvs.Position_Id = pums.Position_Id
+        AND pvs.Instance = pums.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.User_V AS uvs ON
+    (pums.User_Id = uvs.User_Id
+        AND vlh.Sales_Center_Id = uvs.Sales_Center_Id
+        AND pums.Instance = uvs.Instance)
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Employee_Master_V AS em ON
+    vlh.User_Id = em.Own_Route_Id
+    AND vlh.Instance = em.Instance
+    AND em.Active = true
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Van_Load_Detail_V AS vld ON
+    vlh.Van_Load_Header_Id = vld.Van_Load_Header_Id 
+    AND vlh.Instance = vld.Instance
+LEFT JOIN {bronze_catalog}.{bronze_schema}.Product_Master_V AS pmv ON
+    vld.Product_Id = pmv.Product_Id  
+    AND vld.Instance = pmv.Instance
+    AND pmv.Product_Level_Id = 5
+    AND pmv.Active = true
+LEFT JOIN
+    (
+    SELECT
+        DISTINCT Lov_Id,
+        Lov_Code,
+        Lov_Name,
+        Instance,
+        Lov_Type
+    FROM
+        {bronze_catalog}.{bronze_schema}.List_Value_V
+    WHERE
+        Lov_Type = 'PRODUCT_UOM') AS pu ON
+    (vld.Load_Uom_Id = pu.Lov_Id
+        AND vld.Instance = pu.Instance)
+WHERE
+    1 = 1
+    AND (sc.Sales_Center_Code LIKE '02%' OR sc.Sales_Center_Code LIKE '012%')
+    AND vlh.Status = 'I'
+    AND to_date(vlh.Submitted_Date) BETWEEN '2024-01-01' AND '{date_begin}'
+"""
+
+df_c07_pendientes = spark.sql(c07_stock_allocation_pendientes_query)
+
+print(f"Overwriting {silver_catalog}.{silver_schema}.C07_StockAllocation_pendientes")
+df_c07_pendientes.write.format("delta").mode("overwrite").saveAsTable(f"{silver_catalog}.{silver_schema}.C07_StockAllocation_pendientes")
 
 print("Pipeline completed successfully.")
 
