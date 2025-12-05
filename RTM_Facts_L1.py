@@ -1068,9 +1068,6 @@ perform_overwrite_partition(
 # Activity: Z01_Payroll
 # Logic: Delete Date BETWEEN fecha_ini AND FECHA -> Insert
 
-# We need a two_days_ago variable
-two_days_ago = spark.sql(f"SELECT date_sub('{date_begin}', 1) as d").first().d
-
 print(f"Processing Z01_Payroll for range {two_days_ago} to {date_begin}...")
 
 z01_payroll_query = f"""
