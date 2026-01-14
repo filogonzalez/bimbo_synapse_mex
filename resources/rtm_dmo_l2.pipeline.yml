@@ -2,6 +2,11 @@ resources:
   pipelines:
     rtm_dmo_l2:
       name: RTM_DMO_L2
+      permissions:
+        - level: CAN_MANAGE
+          group_name: DnA - Dev MDM IVY Databricks Owner 
+      run_as:
+        user_name: 70dd7f0b-26a6-4e60-8f9e-bab0093ce780
       configuration:
         catalog: ${var.silver_catalog}
         schema: ${var.silver_schema}

@@ -2,6 +2,11 @@ resources:
   jobs:
     wf_rtmfacts_orquestador_dy_l1:
       name: wf_rtmfacts_orquestador_dy_l1
+      permissions:
+        - level: CAN_MANAGE
+          group_name: DnA - Dev MDM IVY Databricks Owner 
+      run_as:
+        user_name: 70dd7f0b-26a6-4e60-8f9e-bab0093ce780
       schedule:
         quartz_cron_expression: 32 0 7 * * ?
         timezone_id: America/Mexico_City
